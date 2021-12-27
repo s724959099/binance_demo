@@ -42,19 +42,35 @@ url = 'https://dapi.binance.com/dapi/v1'
 url = 'https://api.binance.com/api/v3/klines?symbol=BNBUSD_PERP&interval=1m'
 
 
-def _get_kline(api: str, symbol: str, interval: str = '1m', limit: int = 1000):
+def _get_kline(api: str, symbol: str, interval: str = '1m', limit: int = 500):
     url = f'https://{api}.binance.com/{api}/v1/klines'
-    params = dict(symbol=symbol, interval=interval, limit=limit, startTime=1609459200000)
-    r = httpx.get(url, params=params)
-    res = r.json()
-    res = [arr[:6] for arr in res]
-    df = pd.DataFrame(res, columns=['index', 'open', 'high', 'low', 'close', 'volume'])
+    # st_time = 1609459200000  # 2021-01-01
+    st_time = 1639353600000  # 2021-12-13
+    df_list = []
+    total_res = []
+    while True:
+        end_time = st_time + limit * 1000 * 60
+        params = dict(symbol=symbol, interval=interval, limit=limit, startTime=st_time, endTime=end_time)
+        r = httpx.get(url, params=params)
+        res = r.json()
+        if not isinstance(res, list):
+            break
+
+        res = [arr[:6] for arr in res]
+        total_res.extend(res)
+
+        if len(res) != limit:
+            break
+        st_time = res[-1][0] + 60 * 1000
+
+    df = pd.DataFrame(total_res, columns=['index', 'open', 'high', 'low', 'close', 'volume'])
     df['index'] = pd.to_datetime(df['index'], unit='ms')
     df.set_index('index', inplace=True)
     df['open'].astype('float')
     df = df.astype(
         {'open': 'float', 'high': 'float', 'low': 'float', 'close': 'float', 'volume': 'float'}
     )
+
     return df
 
 
